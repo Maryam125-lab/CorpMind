@@ -62,12 +62,17 @@ class DocumentService:
         with saved_path.open("wb") as output:
             shutil.copyfileobj(file.file, output)
 
-        pages = self.loader.load(saved_path)
-        chunks = self.chunker.split(pages)
-        if not chunks:
-            raise ValueError("No indexable text chunks were produced.")
+        try:
+            pages = self.loader.load(saved_path)
+            chunks = self.chunker.split(pages)
+            if not chunks:
+                raise ValueError("No indexable text chunks were produced.")
 
-        self.vector_store.add_chunks(document_id, original_name, chunks)
+            self.vector_store.add_chunks(document_id, original_name, chunks)
+        except Exception:
+            saved_path.unlink(missing_ok=True)
+            raise
+
         summary = DocumentSummary(
             document_id=document_id,
             filename=original_name,

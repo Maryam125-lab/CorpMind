@@ -11,6 +11,6 @@ dist/
 backend/data/uploads/*
 backend/data/chroma/*
 backend/data/documents.json
+backend/data/history.json
 !backend/data/uploads/.gitkeep
 !backend/data/chroma/.gitkeep
-
