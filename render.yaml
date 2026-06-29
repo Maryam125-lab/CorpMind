@@ -9,9 +9,8 @@ services:
       - key: PYTHON_VERSION
         value: 3.12.10
       - key: CORS_ORIGINS
-        value: http://localhost:5173,http://127.0.0.1:5173
+        value: http://localhost:5173,http://127.0.0.1:5173,https://frontend-ko7bphj69-maryam1234sheikh-9239s-projects.vercel.app,https://frontend-maryam1234sheikh-9239s-projects.vercel.app
       - key: CHROMA_PATH
         value: data/chroma
       - key: UPLOAD_PATH
         value: data/uploads
-
