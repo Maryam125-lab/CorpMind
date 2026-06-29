@@ -9,7 +9,7 @@ from fastapi import UploadFile
 
 from app.agents.coordinator import CorpMindCoordinator
 from app.core.config import Settings
-from app.models.schemas import Citation, DocumentSummary, QueryResponse
+from app.models.schemas import Citation, DocumentSummary, QueryHistoryItem, QueryResponse
 from app.rag.chunker import DocumentChunker
 from app.rag.embeddings import build_embeddings
 from app.rag.loader import DocumentLoader
@@ -30,6 +30,7 @@ class DocumentService:
             model=settings.openai_model,
         )
         self.manifest_path = settings.upload_path.parent / "documents.json"
+        self.history_path = settings.upload_path.parent / "history.json"
 
     def list_documents(self) -> list[DocumentSummary]:
         return [
@@ -40,6 +41,17 @@ class DocumentService:
                 reverse=True,
             )
         ]
+
+    def list_history(self, limit: int = 10) -> list[QueryHistoryItem]:
+        history = sorted(
+            self._read_history(),
+            key=lambda item: item["created_at"],
+            reverse=True,
+        )
+        return [QueryHistoryItem(**item) for item in history[:limit]]
+
+    def clear_history(self) -> None:
+        self._write_history([])
 
     def ingest(self, file: UploadFile) -> DocumentSummary:
         original_name = file.filename or "document"
@@ -87,7 +99,7 @@ class DocumentService:
         matches = self.vector_store.query(question, top_k=top_k, document_ids=document_ids)
         citations = [self._match_to_citation(match) for match in matches]
         agent_answer = self.coordinator.answer(question, matches, citations)
-        return QueryResponse(
+        response = QueryResponse(
             answer=agent_answer.answer,
             citations=citations,
             confidence=agent_answer.confidence,
@@ -98,6 +110,8 @@ class DocumentService:
                 "vector_store": self.vector_store.backend_name,
             },
         )
+        self._record_history(question, response)
+        return response
 
     def _match_to_citation(self, match: dict) -> Citation:
         metadata = match["metadata"]
@@ -129,5 +143,30 @@ class DocumentService:
     def _write_manifest(self, manifest: dict) -> None:
         self.manifest_path.write_text(
             json.dumps(manifest, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+
+    def _record_history(self, question: str, response: QueryResponse) -> None:
+        history = self._read_history()
+        history.append(
+            {
+                "history_id": uuid4().hex,
+                "question": question,
+                "answer_preview": self._snippet(response.answer, limit=220),
+                "citation_count": len(response.citations),
+                "confidence": response.confidence,
+                "created_at": datetime.now(UTC).isoformat(),
+            }
+        )
+        self._write_history(history[-50:])
+
+    def _read_history(self) -> list[dict]:
+        if not self.history_path.exists():
+            return []
+        return json.loads(self.history_path.read_text(encoding="utf-8"))
+
+    def _write_history(self, history: list[dict]) -> None:
+        self.history_path.write_text(
+            json.dumps(history, indent=2, sort_keys=True),
             encoding="utf-8",
         )

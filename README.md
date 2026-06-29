@@ -6,6 +6,8 @@ Enterprise Document Q&A Assistant built with a RAG pipeline, ChromaDB, FastAPI, 
 
 CorpMind lets a user upload PDF or text documents, ask questions, and receive grounded answers with source citations. The backend parses uploaded files, splits text into chunks, embeds each chunk, stores vectors in ChromaDB, retrieves the most relevant chunks for a question, and asks a synthesis agent to produce a cited answer.
 
+The workspace includes corpus metrics, source filtering, scoped retrieval, one-click executive summaries, query history, confidence metadata, ranked evidence cards, and Markdown answer export.
+
 ## Architecture
 
 ```text

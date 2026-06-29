@@ -45,3 +45,14 @@ export async function askQuestion({ question, documentIds, topK }) {
   return parseResponse(response);
 }
 
+export async function listHistory() {
+  const response = await fetch(`${API_BASE}/history`);
+  return parseResponse(response);
+}
+
+export async function clearHistory() {
+  const response = await fetch(`${API_BASE}/history`, {
+    method: "DELETE"
+  });
+  return parseResponse(response);
+}

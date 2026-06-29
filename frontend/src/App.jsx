@@ -3,18 +3,28 @@ import {
   Brain,
   CheckCircle2,
   Database,
+  Download,
   FileSearch,
   FileText,
   Filter,
+  History,
   Layers3,
   Loader2,
+  RefreshCcw,
   Search,
   ShieldCheck,
   Sparkles,
   Trash2,
   UploadCloud
 } from "lucide-react";
-import { askQuestion, deleteDocument, listDocuments, uploadDocument } from "./api";
+import {
+  askQuestion,
+  clearHistory,
+  deleteDocument,
+  listDocuments,
+  listHistory,
+  uploadDocument
+} from "./api";
 
 const sampleQuestions = [
   "Summarize the document with the most important decisions.",
@@ -39,9 +49,11 @@ function App() {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [documentFilter, setDocumentFilter] = useState("");
+  const [history, setHistory] = useState([]);
 
   useEffect(() => {
     refreshDocuments();
+    refreshHistory();
   }, []);
 
   const selectedCount = useMemo(
@@ -67,6 +79,15 @@ function App() {
     try {
       const data = await listDocuments();
       setDocuments(data);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function refreshHistory() {
+    try {
+      const data = await listHistory();
+      setHistory(data);
     } catch (err) {
       setError(err.message);
     }
@@ -102,11 +123,68 @@ function App() {
         topK
       });
       setAnswer(data);
+      await refreshHistory();
     } catch (err) {
       setError(err.message);
     } finally {
       setBusy("");
     }
+  }
+
+  async function handleSummarize() {
+    const prompt = selectedIds.length
+      ? "Create an executive summary of the selected documents. Include key facts, risks, decisions, and citations."
+      : "Create an executive summary of all indexed documents. Include key facts, risks, decisions, and citations.";
+    setQuestion(prompt);
+    setBusy("ask");
+    setError("");
+    setAnswer(null);
+    try {
+      const data = await askQuestion({
+        question: prompt,
+        documentIds: selectedIds,
+        topK: Math.max(topK, 6)
+      });
+      setAnswer(data);
+      await refreshHistory();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function handleClearHistory() {
+    setBusy("history");
+    setError("");
+    try {
+      await clearHistory();
+      setHistory([]);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy("");
+    }
+  }
+
+  function exportAnswer() {
+    if (!answer) return;
+    const citationLines = answer.citations
+      .map(
+        (citation, index) =>
+          `${index + 1}. ${citation.filename} ${
+            citation.page ? `(page ${citation.page})` : "(text file)"
+          } - score ${citation.score}\n   ${citation.snippet}`
+      )
+      .join("\n\n");
+    const markdown = `# CorpMind Answer\n\n## Question\n${question}\n\n## Answer\n${answer.answer}\n\n## Citations\n${citationLines || "No citations returned."}\n`;
+    const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "corpmind-answer.md";
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   async function handleDelete(documentId) {
@@ -289,6 +367,27 @@ function App() {
               ))}
             </div>
 
+            <div className="action-row">
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={handleSummarize}
+                disabled={busy === "ask" || !documents.length}
+              >
+                <Sparkles size={17} />
+                <span>Executive summary</span>
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={exportAnswer}
+                disabled={!answer}
+              >
+                <Download size={17} />
+                <span>Export answer</span>
+              </button>
+            </div>
+
             <div className="controls-row">
               <label className="range-control">
                 <span>Evidence depth</span>
@@ -308,6 +407,49 @@ function App() {
               </button>
             </div>
           </form>
+
+          <section className="history-panel" aria-label="Recent questions">
+            <div className="history-header">
+              <div>
+                <h2>Recent Questions</h2>
+                <p>{history.length ? "Reusable analysis trail" : "No query history yet"}</p>
+              </div>
+              <button
+                className="quiet-button"
+                type="button"
+                onClick={handleClearHistory}
+                disabled={!history.length || busy === "history"}
+              >
+                {busy === "history" ? <Loader2 className="spin" size={14} /> : <RefreshCcw size={14} />}
+                Clear
+              </button>
+            </div>
+            <div className="history-list">
+              {history.length ? (
+                history.map((item) => (
+                  <button
+                    className="history-item"
+                    key={item.history_id}
+                    type="button"
+                    onClick={() => setQuestion(item.question)}
+                  >
+                    <History size={16} />
+                    <span>
+                      <strong>{item.question}</strong>
+                      <small>
+                        {item.citation_count} citations / {item.confidence} confidence
+                      </small>
+                    </span>
+                  </button>
+                ))
+              ) : (
+                <div className="history-empty">
+                  <History size={18} />
+                  <span>Ask a question to build an analysis trail.</span>
+                </div>
+              )}
+            </div>
+          </section>
 
           <section className="answer-panel" aria-label="Answer">
             {answer ? (

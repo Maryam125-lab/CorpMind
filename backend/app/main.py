@@ -4,7 +4,7 @@ from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import Settings, get_settings
-from app.models.schemas import DocumentSummary, QueryRequest, QueryResponse
+from app.models.schemas import DocumentSummary, QueryHistoryItem, QueryRequest, QueryResponse
 from app.services.document_service import DocumentService
 
 
@@ -47,6 +47,17 @@ def list_documents(service: DocumentService = Depends(get_document_service)) -> 
     return service.list_documents()
 
 
+@app.get("/history", response_model=list[QueryHistoryItem])
+def list_history(service: DocumentService = Depends(get_document_service)) -> list[QueryHistoryItem]:
+    return service.list_history()
+
+
+@app.delete("/history")
+def clear_history(service: DocumentService = Depends(get_document_service)) -> dict:
+    service.clear_history()
+    return {"deleted": True}
+
+
 @app.delete("/documents/{document_id}")
 def delete_document(
     document_id: str,
@@ -68,4 +79,3 @@ def query_documents(
         top_k=request.top_k,
         document_ids=request.document_ids,
     )
-

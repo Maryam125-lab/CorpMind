@@ -32,3 +32,11 @@ class QueryResponse(BaseModel):
     confidence: str
     metadata: dict[str, Any] = Field(default_factory=dict)
 
+
+class QueryHistoryItem(BaseModel):
+    history_id: str
+    question: str
+    answer_preview: str
+    citation_count: int
+    confidence: str
+    created_at: datetime

@@ -36,5 +36,6 @@ Synthesis Agent:
 - `POST /documents` uploads and indexes a document.
 - `GET /documents` lists uploaded documents.
 - `POST /query` asks a question over the indexed corpus.
+- `GET /history` lists recent questions.
+- `DELETE /history` clears the analysis trail.
 - `DELETE /documents/{document_id}` removes a document and its chunks.
-
