@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: corpmind-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: CORS_ORIGINS
+        value: http://localhost:5173,http://127.0.0.1:5173
+      - key: CHROMA_PATH
+        value: data/chroma
+      - key: UPLOAD_PATH
+        value: data/uploads
+

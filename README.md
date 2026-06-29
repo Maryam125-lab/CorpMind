@@ -99,6 +99,21 @@ Open `http://127.0.0.1:5173`.
 
 Open the `CorpMind` folder in VS Code. The project includes `.vscode` tasks for creating the backend virtual environment, installing dependencies, running the FastAPI API, and running the React dev server.
 
+## Deployment
+
+Recommended portfolio deployment:
+
+- Backend: Render web service using `render.yaml`.
+- Frontend: Vercel project from the `frontend` folder.
+
+After the backend is deployed, set this Vercel environment variable:
+
+```env
+VITE_API_BASE_URL=https://your-render-backend-url
+```
+
+Also update the backend `CORS_ORIGINS` on Render to include the final Vercel URL.
+
 ## Portfolio Talking Points
 
 - Built an end-to-end RAG system for document question answering.
