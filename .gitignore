@@ -1,0 +1,16 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+node_modules/
+dist/
+.vite/
+backend/data/uploads/*
+backend/data/chroma/*
+backend/data/documents.json
+!backend/data/uploads/.gitkeep
+!backend/data/chroma/.gitkeep
+

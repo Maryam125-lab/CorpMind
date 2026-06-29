@@ -1,0 +1,6 @@
+-r requirements.txt
+
+# Optional full portfolio stack. On Windows, ChromaDB may require Microsoft C++ Build Tools.
+chromadb==0.5.23
+crewai==0.86.0
+
