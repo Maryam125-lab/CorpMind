@@ -1,0 +1,8 @@
+.venv/
+data/chroma/*
+data/uploads/*
+data/documents.json
+data/history.json
+__pycache__/
+*.pyc
+.pytest_cache/

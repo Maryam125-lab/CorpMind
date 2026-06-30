@@ -15,7 +15,12 @@ class Settings(BaseSettings):
     chroma_path: Path = Field(default=BACKEND_DIR / "data" / "chroma", alias="CHROMA_PATH")
     upload_path: Path = Field(default=BACKEND_DIR / "data" / "uploads", alias="UPLOAD_PATH")
     cors_origins: str = Field(
-        default="http://localhost:5173,http://127.0.0.1:5173",
+        default=(
+            "http://localhost:5173,"
+            "http://127.0.0.1:5173,"
+            "https://frontend-a1yghmpn9-maryam1234sheikh-9239s-projects.vercel.app,"
+            "https://frontend-weld-tau-dvyohmsjzz.vercel.app"
+        ),
         alias="CORS_ORIGINS",
     )
 

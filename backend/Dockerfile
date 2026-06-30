@@ -4,7 +4,7 @@ WORKDIR /app
 
 ENV PIP_NO_CACHE_DIR=1
 ENV PYTHONUNBUFFERED=1
-ENV PORT=8010
+ENV PORT=7860
 
 COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
