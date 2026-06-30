@@ -1,26 +1,39 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  Activity,
+  BarChart3,
+  BookOpenCheck,
   Brain,
   CheckCircle2,
+  ClipboardList,
   Database,
   Download,
+  Eye,
   FileSearch,
   FileText,
   Filter,
+  GitBranch,
   History,
   Layers3,
   Loader2,
+  MessageSquareText,
+  Network,
   RefreshCcw,
   Search,
+  ShieldAlert,
   ShieldCheck,
   Sparkles,
+  Target,
   Trash2,
-  UploadCloud
+  UploadCloud,
+  Wand2
 } from "lucide-react";
 import {
   askQuestion,
   clearHistory,
   deleteDocument,
+  getDocumentInsights,
+  healthCheck,
   listDocuments,
   listHistory,
   uploadDocument
@@ -30,6 +43,110 @@ const sampleQuestions = [
   "Summarize the document with the most important decisions.",
   "What obligations, risks, and deadlines are mentioned?",
   "Which facts should I cite in a project explanation?"
+];
+
+const analysisModes = [
+  {
+    id: "answer",
+    label: "Answer",
+    icon: MessageSquareText,
+    prefix: ""
+  },
+  {
+    id: "risk",
+    label: "Risk",
+    icon: ShieldAlert,
+    prefix:
+      "Analyze this as an enterprise risk review. Highlight obligations, deadlines, missing context, and risk severity. Question: "
+  },
+  {
+    id: "brief",
+    label: "Brief",
+    icon: ClipboardList,
+    prefix:
+      "Create a portfolio-ready executive brief with key findings, evidence, and action items. Question: "
+  },
+  {
+    id: "compare",
+    label: "Compare",
+    icon: GitBranch,
+    prefix:
+      "Compare the selected sources and identify agreements, conflicts, and unique facts. Question: "
+  }
+];
+
+const demoDocuments = [
+  {
+    document_id: "demo-policy",
+    filename: "Acme-Data-Protection-Policy.pdf",
+    chunks: 18,
+    uploaded_at: "2026-06-28T10:20:00.000Z"
+  },
+  {
+    document_id: "demo-contract",
+    filename: "Vendor-Service-Agreement.pdf",
+    chunks: 24,
+    uploaded_at: "2026-06-28T10:26:00.000Z"
+  },
+  {
+    document_id: "demo-report",
+    filename: "Q2-Risk-Review.md",
+    chunks: 11,
+    uploaded_at: "2026-06-28T10:34:00.000Z"
+  }
+];
+
+const demoInsights = {
+  "demo-policy": {
+    document_id: "demo-policy",
+    filename: "Acme-Data-Protection-Policy.pdf",
+    chunks: 18,
+    uploaded_at: "2026-06-28T10:20:00.000Z",
+    pages: 8,
+    words: 3850,
+    estimated_read_minutes: 18,
+    key_terms: ["retention", "access", "encryption", "audit", "privacy", "incident"],
+    risk_terms: ["breach", "compliance", "confidential", "violation"],
+    preview:
+      "Acme requires confidential data to be encrypted at rest and in transit. Access reviews must be completed quarterly. Incidents must be escalated to Security within 24 hours and documented for audit readiness."
+  },
+  "demo-contract": {
+    document_id: "demo-contract",
+    filename: "Vendor-Service-Agreement.pdf",
+    chunks: 24,
+    uploaded_at: "2026-06-28T10:26:00.000Z",
+    pages: 13,
+    words: 6120,
+    estimated_read_minutes: 28,
+    key_terms: ["vendor", "service", "sla", "termination", "payment", "liability"],
+    risk_terms: ["deadline", "liability", "penalty", "termination"],
+    preview:
+      "The vendor must maintain 99.5% monthly uptime and respond to priority incidents within four business hours. Either party may terminate after a material breach if the breach remains uncured for 30 days."
+  },
+  "demo-report": {
+    document_id: "demo-report",
+    filename: "Q2-Risk-Review.md",
+    chunks: 11,
+    uploaded_at: "2026-06-28T10:34:00.000Z",
+    pages: 5,
+    words: 2400,
+    estimated_read_minutes: 11,
+    key_terms: ["controls", "audit", "vendors", "evidence", "exceptions", "remediation"],
+    risk_terms: ["delay", "risk", "deadline", "compliance"],
+    preview:
+      "The Q2 review found delayed evidence collection for vendor controls and incomplete remediation notes. The recommended action is to centralize evidence ownership and review high-risk vendors weekly."
+  }
+};
+
+const demoHistory = [
+  {
+    history_id: "demo-history-1",
+    question: "What are the biggest compliance risks?",
+    answer_preview: "The strongest risk areas are delayed control evidence, breach escalation, and SLA penalties.",
+    citation_count: 3,
+    confidence: "high",
+    created_at: "2026-06-28T11:00:00.000Z"
+  }
 ];
 
 const formatDate = (value) =>
@@ -43,18 +160,51 @@ const formatDate = (value) =>
 function App() {
   const [documents, setDocuments] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
+  const [activeDocumentId, setActiveDocumentId] = useState("");
   const [question, setQuestion] = useState("");
   const [topK, setTopK] = useState(5);
+  const [analysisMode, setAnalysisMode] = useState("answer");
   const [answer, setAnswer] = useState(null);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [documentFilter, setDocumentFilter] = useState("");
   const [history, setHistory] = useState([]);
+  const [apiStatus, setApiStatus] = useState("checking");
+  const [demoMode, setDemoMode] = useState(false);
+  const [insights, setInsights] = useState({});
+  const [activeCitation, setActiveCitation] = useState(null);
+  const [sessions, setSessions] = useState(() => {
+    const stored = window.localStorage.getItem("corpmind-sessions");
+    return stored
+      ? JSON.parse(stored)
+      : [
+          {
+            id: "session-default",
+            title: "Portfolio Review",
+            messages: []
+          }
+        ];
+  });
+  const [activeSessionId, setActiveSessionId] = useState(() => {
+    return window.localStorage.getItem("corpmind-active-session") || "session-default";
+  });
 
   useEffect(() => {
-    refreshDocuments();
-    refreshHistory();
+    bootstrapWorkspace();
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("corpmind-sessions", JSON.stringify(sessions));
+  }, [sessions]);
+
+  useEffect(() => {
+    window.localStorage.setItem("corpmind-active-session", activeSessionId);
+  }, [activeSessionId]);
+
+  useEffect(() => {
+    if (!activeDocumentId) return;
+    loadInsight(activeDocumentId);
+  }, [activeDocumentId, demoMode]);
 
   const selectedCount = useMemo(
     () => selectedIds.filter((id) => documents.some((doc) => doc.document_id === id)).length,
@@ -66,6 +216,8 @@ function App() {
     [documents]
   );
 
+  const activeInsight = activeDocumentId ? insights[activeDocumentId] : null;
+
   const filteredDocuments = useMemo(() => {
     const query = documentFilter.trim().toLowerCase();
     if (!query) return documents;
@@ -73,14 +225,42 @@ function App() {
   }, [documents, documentFilter]);
 
   const selectedLabel = selectedCount ? `${selectedCount} selected` : "All sources";
-  const vectorStore = answer?.metadata?.vector_store || "ready";
+  const vectorStore = demoMode ? "demo-vector" : answer?.metadata?.vector_store || "ready";
+  const currentMode = analysisModes.find((mode) => mode.id === analysisMode) || analysisModes[0];
+  const activeSession = sessions.find((session) => session.id === activeSessionId) || sessions[0];
+  const confidenceScore = answer?.confidence === "high" ? 94 : answer?.confidence === "medium" ? 72 : answer ? 48 : 0;
+
+  async function bootstrapWorkspace() {
+    try {
+      await healthCheck();
+      setApiStatus("online");
+      await refreshDocuments();
+      await refreshHistory();
+    } catch (err) {
+      activateDemoMode();
+    }
+  }
+
+  function activateDemoMode(message = "") {
+    setDemoMode(true);
+    setApiStatus("demo");
+    setDocuments(demoDocuments);
+    setHistory(demoHistory);
+    setInsights(demoInsights);
+    setSelectedIds([]);
+    setActiveDocumentId("demo-policy");
+    if (message) setError(message);
+  }
 
   async function refreshDocuments() {
     try {
       const data = await listDocuments();
       setDocuments(data);
+      setDemoMode(false);
+      setApiStatus("online");
+      if (!activeDocumentId && data[0]) setActiveDocumentId(data[0].document_id);
     } catch (err) {
-      setError(err.message);
+      activateDemoMode("Backend is offline, so CorpMind is showing a safe portfolio demo workspace.");
     }
   }
 
@@ -88,6 +268,20 @@ function App() {
     try {
       const data = await listHistory();
       setHistory(data);
+    } catch (err) {
+      if (!demoMode) setError(err.message);
+    }
+  }
+
+  async function loadInsight(documentId) {
+    if (insights[documentId]) return;
+    if (demoMode) {
+      setInsights((current) => ({ ...current, [documentId]: demoInsights[documentId] }));
+      return;
+    }
+    try {
+      const data = await getDocumentInsights(documentId);
+      setInsights((current) => ({ ...current, [documentId]: data }));
     } catch (err) {
       setError(err.message);
     }
@@ -99,9 +293,36 @@ function App() {
     setBusy("upload");
     setError("");
     try {
-      const uploaded = await uploadDocument(file);
-      await refreshDocuments();
-      setSelectedIds((current) => [...new Set([...current, uploaded.document_id])]);
+      if (demoMode) {
+        const documentId = `demo-upload-${Date.now()}`;
+        const uploaded = {
+          document_id: documentId,
+          filename: file.name,
+          chunks: Math.max(4, Math.round(file.size / 1200)),
+          uploaded_at: new Date().toISOString()
+        };
+        setDocuments((current) => [uploaded, ...current]);
+        setInsights((current) => ({
+          ...current,
+          [documentId]: {
+            ...uploaded,
+            pages: 1,
+            words: Math.max(260, Math.round(file.size / 7)),
+            estimated_read_minutes: 2,
+            key_terms: ["uploaded", "source", "demo", "analysis"],
+            risk_terms: [],
+            preview:
+              "Demo Mode accepted this file locally for the UI preview. Run the FastAPI backend locally or deploy it to process real document text."
+          }
+        }));
+        setSelectedIds((current) => [...new Set([documentId, ...current])]);
+        setActiveDocumentId(documentId);
+      } else {
+        const uploaded = await uploadDocument(file);
+        await refreshDocuments();
+        setSelectedIds((current) => [...new Set([...current, uploaded.document_id])]);
+        setActiveDocumentId(uploaded.document_id);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -116,14 +337,34 @@ function App() {
     setBusy("ask");
     setError("");
     setAnswer(null);
+    setActiveCitation(null);
+    const prompt = `${currentMode.prefix}${question.trim()}`;
     try {
-      const data = await askQuestion({
-        question: question.trim(),
-        documentIds: selectedIds,
-        topK
-      });
+      const data = demoMode
+        ? buildDemoAnswer(prompt, selectedIds, topK, currentMode.id)
+        : await askQuestion({
+            question: prompt,
+            documentIds: selectedIds,
+            topK
+          });
       setAnswer(data);
-      await refreshHistory();
+      setActiveCitation(data.citations[0] || null);
+      appendSessionMessage(question.trim(), data);
+      if (demoMode) {
+        setHistory((current) => [
+          {
+            history_id: `demo-history-${Date.now()}`,
+            question: question.trim(),
+            answer_preview: data.answer.slice(0, 180),
+            citation_count: data.citations.length,
+            confidence: data.confidence,
+            created_at: new Date().toISOString()
+          },
+          ...current
+        ]);
+      } else {
+        await refreshHistory();
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -139,14 +380,19 @@ function App() {
     setBusy("ask");
     setError("");
     setAnswer(null);
+    setActiveCitation(null);
     try {
-      const data = await askQuestion({
-        question: prompt,
-        documentIds: selectedIds,
-        topK: Math.max(topK, 6)
-      });
+      const data = demoMode
+        ? buildDemoAnswer(prompt, selectedIds, Math.max(topK, 6), "brief")
+        : await askQuestion({
+            question: prompt,
+            documentIds: selectedIds,
+            topK: Math.max(topK, 6)
+          });
       setAnswer(data);
-      await refreshHistory();
+      setActiveCitation(data.citations[0] || null);
+      appendSessionMessage(prompt, data);
+      if (!demoMode) await refreshHistory();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -158,8 +404,12 @@ function App() {
     setBusy("history");
     setError("");
     try {
-      await clearHistory();
-      setHistory([]);
+      if (demoMode) {
+        setHistory([]);
+      } else {
+        await clearHistory();
+        setHistory([]);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -177,7 +427,7 @@ function App() {
           } - score ${citation.score}\n   ${citation.snippet}`
       )
       .join("\n\n");
-    const markdown = `# CorpMind Answer\n\n## Question\n${question}\n\n## Answer\n${answer.answer}\n\n## Citations\n${citationLines || "No citations returned."}\n`;
+    const markdown = `# CorpMind Answer\n\n## Mode\n${currentMode.label}\n\n## Question\n${question}\n\n## Answer\n${answer.answer}\n\n## Citations\n${citationLines || "No citations returned."}\n`;
     const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -191,9 +441,14 @@ function App() {
     setBusy(documentId);
     setError("");
     try {
-      await deleteDocument(documentId);
+      if (demoMode) {
+        setDocuments((current) => current.filter((document) => document.document_id !== documentId));
+      } else {
+        await deleteDocument(documentId);
+        await refreshDocuments();
+      }
       setSelectedIds((current) => current.filter((id) => id !== documentId));
-      await refreshDocuments();
+      if (activeDocumentId === documentId) setActiveDocumentId("");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -201,7 +456,45 @@ function App() {
     }
   }
 
+  function appendSessionMessage(prompt, data) {
+    setSessions((current) =>
+      current.map((session) =>
+        session.id === activeSessionId
+          ? {
+              ...session,
+              messages: [
+                {
+                  id: `message-${Date.now()}`,
+                  question: prompt,
+                  answer: data.answer,
+                  citations: data.citations.length,
+                  createdAt: new Date().toISOString()
+                },
+                ...session.messages
+              ].slice(0, 8)
+            }
+          : session
+      )
+    );
+  }
+
+  function createSession() {
+    const id = `session-${Date.now()}`;
+    setSessions((current) => [
+      {
+        id,
+        title: `Analysis ${current.length + 1}`,
+        messages: []
+      },
+      ...current
+    ]);
+    setActiveSessionId(id);
+    setAnswer(null);
+    setQuestion("");
+  }
+
   function toggleDocument(documentId) {
+    setActiveDocumentId(documentId);
     setSelectedIds((current) =>
       current.includes(documentId)
         ? current.filter((id) => id !== documentId)
@@ -231,9 +524,9 @@ function App() {
         </div>
 
         <div className="topbar-actions">
-          <div className="status-pill">
-            <CheckCircle2 size={16} />
-            <span>API online</span>
+          <div className={`status-pill ${apiStatus === "demo" ? "warning" : ""}`}>
+            {apiStatus === "online" ? <CheckCircle2 size={16} /> : <Activity size={16} />}
+            <span>{apiStatus === "online" ? "API online" : apiStatus === "demo" ? "Demo mode" : "Checking"}</span>
           </div>
           <div className="status-pill muted">
             <Database size={16} />
@@ -246,7 +539,7 @@ function App() {
         <Metric icon={FileText} label="Documents" value={documents.length} />
         <Metric icon={Layers3} label="Chunks indexed" value={totalChunks} />
         <Metric icon={Filter} label="Scope" value={selectedLabel} />
-        <Metric icon={ShieldCheck} label="Citations" value={answer?.citations?.length || 0} />
+        <Metric icon={Target} label="Confidence" value={answer ? `${confidenceScore}%` : "Ready"} />
       </section>
 
       {error ? <div className="error-banner">{error}</div> : null}
@@ -257,7 +550,7 @@ function App() {
             <input type="file" accept=".pdf,.txt,.md" onChange={handleUpload} />
             {busy === "upload" ? <Loader2 className="spin" size={24} /> : <UploadCloud size={28} />}
             <span>
-              <strong>Upload source</strong>
+              <strong>{demoMode ? "Preview upload" : "Upload source"}</strong>
               <small>PDF, TXT, or Markdown</small>
             </span>
           </label>
@@ -297,7 +590,7 @@ function App() {
                 <article
                   className={`document-row ${
                     selectedIds.includes(document.document_id) ? "selected" : ""
-                  }`}
+                  } ${activeDocumentId === document.document_id ? "active" : ""}`}
                   key={document.document_id}
                 >
                   <button
@@ -315,20 +608,31 @@ function App() {
                       </small>
                     </span>
                   </button>
-                  <button
-                    className="icon-button"
-                    type="button"
-                    aria-label={`Delete ${document.filename}`}
-                    title="Delete"
-                    onClick={() => handleDelete(document.document_id)}
-                    disabled={busy === document.document_id}
-                  >
-                    {busy === document.document_id ? (
-                      <Loader2 className="spin" size={16} />
-                    ) : (
-                      <Trash2 size={16} />
-                    )}
-                  </button>
+                  <div className="row-actions">
+                    <button
+                      className="icon-button neutral"
+                      type="button"
+                      aria-label={`Inspect ${document.filename}`}
+                      title="Inspect"
+                      onClick={() => setActiveDocumentId(document.document_id)}
+                    >
+                      <Eye size={16} />
+                    </button>
+                    <button
+                      className="icon-button"
+                      type="button"
+                      aria-label={`Delete ${document.filename}`}
+                      title="Delete"
+                      onClick={() => handleDelete(document.document_id)}
+                      disabled={busy === document.document_id}
+                    >
+                      {busy === document.document_id ? (
+                        <Loader2 className="spin" size={16} />
+                      ) : (
+                        <Trash2 size={16} />
+                      )}
+                    </button>
+                  </div>
                 </article>
               ))
             )}
@@ -344,8 +648,25 @@ function App() {
               </div>
               <span className="confidence-chip">
                 <Sparkles size={15} />
-                {answer?.confidence || "ready"}
+                {answer?.confidence || currentMode.label}
               </span>
+            </div>
+
+            <div className="mode-tabs" aria-label="Analysis mode">
+              {analysisModes.map((mode) => {
+                const Icon = mode.icon;
+                return (
+                  <button
+                    className={analysisMode === mode.id ? "active" : ""}
+                    key={mode.id}
+                    type="button"
+                    onClick={() => setAnalysisMode(mode.id)}
+                  >
+                    <Icon size={15} />
+                    {mode.label}
+                  </button>
+                );
+              })}
             </div>
 
             <div className="question-box">
@@ -386,6 +707,10 @@ function App() {
                 <Download size={17} />
                 <span>Export answer</span>
               </button>
+              <button className="secondary-button" type="button" onClick={createSession}>
+                <Wand2 size={17} />
+                <span>New session</span>
+              </button>
             </div>
 
             <div className="controls-row">
@@ -407,6 +732,90 @@ function App() {
               </button>
             </div>
           </form>
+
+          <section className="intelligence-grid" aria-label="Advanced analysis">
+            <DocumentIntel insight={activeInsight} />
+            <SessionPanel
+              activeSession={activeSession}
+              sessions={sessions}
+              setActiveSessionId={setActiveSessionId}
+            />
+          </section>
+
+          <section className="answer-panel" aria-label="Answer">
+            {answer ? (
+              <>
+                <div className="answer-header">
+                  <div>
+                    <h2>Grounded Answer</h2>
+                    <p>
+                      {answer.metadata?.matches || 0} matches /{" "}
+                      {answer.metadata?.uses_openai ? "LLM synthesis" : "extractive synthesis"}
+                    </p>
+                  </div>
+                  <span>{answer.confidence} confidence</span>
+                </div>
+                <p className="answer-text">{answer.answer}</p>
+              </>
+            ) : (
+              <div className="empty-answer">
+                <Brain size={36} />
+                <p>Ask a question to generate an answer with traceable evidence.</p>
+              </div>
+            )}
+          </section>
+        </section>
+
+        <aside className="citations-pane" aria-label="Citations">
+          <div className="panel-heading">
+            <div>
+              <h2>Evidence</h2>
+              <p>{answer?.citations?.length ? "Ranked source passages" : "Waiting for a query"}</p>
+            </div>
+            <span className="count-badge">{answer?.citations?.length || 0}</span>
+          </div>
+
+          <CitationPreview citation={activeCitation} />
+
+          <div className="citation-list">
+            {answer?.citations?.length ? (
+              answer.citations.map((citation, index) => (
+                <article
+                  className={`citation-card ${
+                    activeCitation?.chunk_id === citation.chunk_id ? "active" : ""
+                  }`}
+                  key={citation.chunk_id}
+                >
+                  <button
+                    className="citation-rank"
+                    type="button"
+                    onClick={() => setActiveCitation(citation)}
+                    title="Preview evidence"
+                  >
+                    {index + 1}
+                  </button>
+                  <div className="citation-body">
+                    <div className="citation-meta">
+                      <strong>{citation.filename}</strong>
+                      <span>
+                        {citation.page ? `Page ${citation.page}` : "Text file"} / Score{" "}
+                        {citation.score?.toFixed?.(2) ?? citation.score}
+                      </span>
+                    </div>
+                    <div className="score-track">
+                      <span style={{ width: `${Math.max((citation.score || 0) * 100, 8)}%` }} />
+                    </div>
+                    <p>{citation.snippet}</p>
+                  </div>
+                </article>
+              ))
+            ) : (
+              <div className="empty-state">
+                <ShieldCheck size={30} />
+                <p>Citations will appear here after each answer.</p>
+              </div>
+            )}
+          </div>
 
           <section className="history-panel" aria-label="Recent questions">
             <div className="history-header">
@@ -450,67 +859,6 @@ function App() {
               )}
             </div>
           </section>
-
-          <section className="answer-panel" aria-label="Answer">
-            {answer ? (
-              <>
-                <div className="answer-header">
-                  <div>
-                    <h2>Grounded Answer</h2>
-                    <p>
-                      {answer.metadata?.matches || 0} matches /{" "}
-                      {answer.metadata?.uses_openai ? "LLM synthesis" : "extractive synthesis"}
-                    </p>
-                  </div>
-                  <span>{answer.confidence} confidence</span>
-                </div>
-                <p className="answer-text">{answer.answer}</p>
-              </>
-            ) : (
-              <div className="empty-answer">
-                <Brain size={36} />
-                <p>Ask a question to generate an answer with traceable evidence.</p>
-              </div>
-            )}
-          </section>
-        </section>
-
-        <aside className="citations-pane" aria-label="Citations">
-          <div className="panel-heading">
-            <div>
-              <h2>Evidence</h2>
-              <p>{answer?.citations?.length ? "Ranked source passages" : "Waiting for a query"}</p>
-            </div>
-            <span className="count-badge">{answer?.citations?.length || 0}</span>
-          </div>
-
-          <div className="citation-list">
-            {answer?.citations?.length ? (
-              answer.citations.map((citation, index) => (
-                <article className="citation-card" key={citation.chunk_id}>
-                  <div className="citation-rank">{index + 1}</div>
-                  <div className="citation-body">
-                    <div className="citation-meta">
-                      <strong>{citation.filename}</strong>
-                      <span>
-                        {citation.page ? `Page ${citation.page}` : "Text file"} / Score{" "}
-                        {citation.score?.toFixed?.(2) ?? citation.score}
-                      </span>
-                    </div>
-                    <div className="score-track">
-                      <span style={{ width: `${Math.max((citation.score || 0) * 100, 8)}%` }} />
-                    </div>
-                    <p>{citation.snippet}</p>
-                  </div>
-                </article>
-              ))
-            ) : (
-              <div className="empty-state">
-                <ShieldCheck size={30} />
-                <p>Citations will appear here after each answer.</p>
-              </div>
-            )}
-          </div>
         </aside>
       </section>
     </main>
@@ -529,6 +877,162 @@ function Metric({ icon: Icon, label, value }) {
       </div>
     </article>
   );
+}
+
+function DocumentIntel({ insight }) {
+  if (!insight) {
+    return (
+      <section className="intel-card">
+        <div className="mini-heading">
+          <BookOpenCheck size={17} />
+          <h2>Document Intelligence</h2>
+        </div>
+        <p className="muted-copy">Select a source to inspect pages, key terms, risks, and preview text.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="intel-card">
+      <div className="mini-heading">
+        <BookOpenCheck size={17} />
+        <h2>Document Intelligence</h2>
+      </div>
+      <strong className="intel-title">{insight.filename}</strong>
+      <div className="intel-stats">
+        <span>{insight.pages} pages</span>
+        <span>{insight.words} words</span>
+        <span>{insight.estimated_read_minutes} min read</span>
+      </div>
+      <p className="preview-copy">{insight.preview}</p>
+      <TagList label="Key terms" values={insight.key_terms} />
+      <TagList label="Risk terms" values={insight.risk_terms} tone="risk" />
+    </section>
+  );
+}
+
+function TagList({ label, values, tone = "default" }) {
+  return (
+    <div className="tag-block">
+      <span>{label}</span>
+      <div>
+        {values.length ? (
+          values.map((value) => (
+            <strong className={tone === "risk" ? "risk" : ""} key={value}>
+              {value}
+            </strong>
+          ))
+        ) : (
+          <small>None detected</small>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SessionPanel({ activeSession, sessions, setActiveSessionId }) {
+  return (
+    <section className="intel-card session-card">
+      <div className="mini-heading">
+        <Network size={17} />
+        <h2>Analysis Sessions</h2>
+      </div>
+      <div className="session-tabs">
+        {sessions.map((session) => (
+          <button
+            className={activeSession?.id === session.id ? "active" : ""}
+            key={session.id}
+            type="button"
+            onClick={() => setActiveSessionId(session.id)}
+          >
+            {session.title}
+          </button>
+        ))}
+      </div>
+      <div className="session-log">
+        {activeSession?.messages?.length ? (
+          activeSession.messages.map((message) => (
+            <article key={message.id}>
+              <strong>{message.question}</strong>
+              <small>
+                {message.citations} citations / {formatDate(message.createdAt)}
+              </small>
+            </article>
+          ))
+        ) : (
+          <p className="muted-copy">This session is ready for a new analysis trail.</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function CitationPreview({ citation }) {
+  if (!citation) {
+    return (
+      <section className="citation-preview">
+        <BarChart3 size={18} />
+        <p>Select evidence after asking a question to inspect the strongest cited passage.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="citation-preview active">
+      <div>
+        <BarChart3 size={18} />
+        <strong>Evidence Preview</strong>
+      </div>
+      <p>{citation.snippet}</p>
+      <small>
+        {citation.filename} / {citation.page ? `Page ${citation.page}` : "Text file"} / Score{" "}
+        {citation.score?.toFixed?.(2) ?? citation.score}
+      </small>
+    </section>
+  );
+}
+
+function buildDemoAnswer(question, documentIds, topK, mode) {
+  const scopedIds = documentIds.length ? documentIds : demoDocuments.map((document) => document.document_id);
+  const sources = scopedIds
+    .map((id) => demoInsights[id])
+    .filter(Boolean)
+    .slice(0, Math.max(1, Math.min(topK, 5)));
+  const citations = sources.map((source, index) => ({
+    document_id: source.document_id,
+    filename: source.filename,
+    page: index + 2,
+    chunk_id: `${source.document_id}:demo-${index}`,
+    snippet: source.preview,
+    score: Number((0.91 - index * 0.07).toFixed(2))
+  }));
+  const riskTerms = [...new Set(sources.flatMap((source) => source.risk_terms))];
+  const keyTerms = [...new Set(sources.flatMap((source) => source.key_terms))].slice(0, 6);
+
+  const modeLead =
+    mode === "risk"
+      ? "Risk review: the strongest signals are compliance exposure, deadline ownership, and vendor accountability."
+      : mode === "compare"
+        ? "Comparison brief: the selected sources agree on stronger evidence ownership, but each source highlights a different operational risk."
+        : mode === "brief"
+          ? "Executive brief: CorpMind found the main decisions, risks, and evidence points across the selected sources."
+          : "Grounded answer: CorpMind found relevant evidence in the selected sources.";
+
+  return {
+    answer: `${modeLead}\n\nQuestion reviewed: ${question}\n\nKey findings: ${keyTerms.join(", ") || "source evidence"}. ${
+      riskTerms.length
+        ? `Risk terms detected include ${riskTerms.join(", ")}.`
+        : "No major risk keywords were detected in the selected sources."
+    }\n\nThis is Demo Mode output for the hosted portfolio link. Running the FastAPI backend locally or deploying it will process real uploaded document text with the same UI workflow.`,
+    citations,
+    confidence: "high",
+    metadata: {
+      matches: citations.length,
+      used_crewai: false,
+      uses_openai: false,
+      vector_store: "demo-vector"
+    }
+  };
 }
 
 export default App;

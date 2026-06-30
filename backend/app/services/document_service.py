@@ -1,6 +1,7 @@
 import json
 import re
 import shutil
+from collections import Counter
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
@@ -9,7 +10,7 @@ from fastapi import UploadFile
 
 from app.agents.coordinator import CorpMindCoordinator
 from app.core.config import Settings
-from app.models.schemas import Citation, DocumentSummary, QueryHistoryItem, QueryResponse
+from app.models.schemas import Citation, DocumentInsight, DocumentSummary, QueryHistoryItem, QueryResponse
 from app.rag.chunker import DocumentChunker
 from app.rag.embeddings import build_embeddings
 from app.rag.loader import DocumentLoader
@@ -17,6 +18,59 @@ from app.rag.vector_store import VectorStore
 
 
 class DocumentService:
+    STOP_WORDS = {
+        "about",
+        "after",
+        "also",
+        "and",
+        "are",
+        "because",
+        "been",
+        "between",
+        "but",
+        "can",
+        "could",
+        "from",
+        "have",
+        "into",
+        "its",
+        "may",
+        "more",
+        "must",
+        "not",
+        "our",
+        "shall",
+        "should",
+        "that",
+        "the",
+        "their",
+        "there",
+        "this",
+        "through",
+        "was",
+        "were",
+        "which",
+        "will",
+        "with",
+        "within",
+        "you",
+        "your",
+    }
+    RISK_TERMS = {
+        "breach",
+        "compliance",
+        "confidential",
+        "deadline",
+        "delay",
+        "dispute",
+        "fine",
+        "liability",
+        "penalty",
+        "risk",
+        "termination",
+        "violation",
+    }
+
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
         self.loader = DocumentLoader()
@@ -41,6 +95,38 @@ class DocumentService:
                 reverse=True,
             )
         ]
+
+    def get_document_insight(self, document_id: str) -> DocumentInsight | None:
+        manifest = self._read_manifest()
+        document = manifest.get(document_id)
+        if not document:
+            return None
+
+        chunks = self.vector_store.list_document_chunks(document_id)
+        text = " ".join(chunk["text"] for chunk in chunks)
+        words = re.findall(r"[A-Za-z][A-Za-z'-]{2,}", text.lower())
+        pages = {
+            chunk["metadata"].get("page")
+            for chunk in chunks
+            if chunk["metadata"].get("page")
+        }
+        terms = [
+            word
+            for word in words
+            if word not in self.STOP_WORDS and len(word) > 3
+        ]
+        key_terms = [term for term, _ in Counter(terms).most_common(8)]
+        risk_terms = sorted({term for term in words if term in self.RISK_TERMS})
+
+        return DocumentInsight(
+            **document,
+            pages=max(len(pages), 1 if chunks else 0),
+            words=len(words),
+            estimated_read_minutes=max(1, round(len(words) / 220)) if words else 0,
+            key_terms=key_terms,
+            risk_terms=risk_terms,
+            preview=self._snippet(text, limit=520) if text else "No indexed text preview is available.",
+        )
 
     def list_history(self, limit: int = 10) -> list[QueryHistoryItem]:
         history = sorted(

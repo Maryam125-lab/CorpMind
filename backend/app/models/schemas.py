@@ -11,6 +11,19 @@ class DocumentSummary(BaseModel):
     uploaded_at: datetime
 
 
+class DocumentInsight(BaseModel):
+    document_id: str
+    filename: str
+    chunks: int
+    uploaded_at: datetime
+    pages: int
+    words: int
+    estimated_read_minutes: int
+    key_terms: list[str]
+    risk_terms: list[str]
+    preview: str
+
+
 class Citation(BaseModel):
     document_id: str
     filename: str

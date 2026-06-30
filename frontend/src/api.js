@@ -8,8 +8,18 @@ async function parseResponse(response) {
   return data;
 }
 
+export async function healthCheck() {
+  const response = await fetch(`${API_BASE}/health`);
+  return parseResponse(response);
+}
+
 export async function listDocuments() {
   const response = await fetch(`${API_BASE}/documents`);
+  return parseResponse(response);
+}
+
+export async function getDocumentInsights(documentId) {
+  const response = await fetch(`${API_BASE}/documents/${documentId}/insights`);
   return parseResponse(response);
 }
 

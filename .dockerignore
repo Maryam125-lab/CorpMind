@@ -1,0 +1,9 @@
+.git
+.vscode
+backend/.venv
+backend/data/chroma/*
+backend/data/uploads/*
+frontend/dist
+frontend/node_modules
+**/__pycache__
+**/.pytest_cache

@@ -40,6 +40,9 @@ class VectorStore:
     def delete_document(self, document_id: str) -> None:
         self.backend.delete_document(document_id)
 
+    def list_document_chunks(self, document_id: str) -> list[dict]:
+        return self.backend.list_document_chunks(document_id)
+
 
 class ChromaVectorStore:
     backend_name = "chromadb"
@@ -94,6 +97,27 @@ class ChromaVectorStore:
 
     def delete_document(self, document_id: str) -> None:
         self.collection.delete(where={"document_id": document_id})
+
+    def list_document_chunks(self, document_id: str) -> list[dict]:
+        result = self.collection.get(
+            where={"document_id": document_id},
+            include=["documents", "metadatas"],
+        )
+        ids: Iterable[str] = result.get("ids", [])
+        documents: Iterable[str] = result.get("documents", [])
+        metadatas: Iterable[dict] = result.get("metadatas", [])
+        return [
+            {
+                "chunk_id": chunk_id,
+                "text": text,
+                "metadata": metadata or {},
+                "score": None,
+            }
+            for chunk_id, text, metadata in sorted(
+                zip(ids, documents, metadatas, strict=False),
+                key=lambda item: item[2].get("chunk_index", 0) if item[2] else 0,
+            )
+        ]
 
     def _build_where(self, document_ids: list[str] | None) -> dict | None:
         if not document_ids:
@@ -187,6 +211,23 @@ class LocalJsonVectorStore:
             if record["metadata"].get("document_id") != document_id
         ]
         self._write_records(records)
+
+    def list_document_chunks(self, document_id: str) -> list[dict]:
+        records = [
+            record
+            for record in self._read_records()
+            if record["metadata"].get("document_id") == document_id
+        ]
+        records.sort(key=lambda record: record["metadata"].get("chunk_index", 0))
+        return [
+            {
+                "chunk_id": record["chunk_id"],
+                "text": record["text"],
+                "metadata": record["metadata"],
+                "score": None,
+            }
+            for record in records
+        ]
 
     def _read_records(self) -> list[dict]:
         if not self.store_path.exists():

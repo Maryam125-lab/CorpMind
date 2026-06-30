@@ -4,7 +4,13 @@ from fastapi import Depends, FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import Settings, get_settings
-from app.models.schemas import DocumentSummary, QueryHistoryItem, QueryRequest, QueryResponse
+from app.models.schemas import (
+    DocumentInsight,
+    DocumentSummary,
+    QueryHistoryItem,
+    QueryRequest,
+    QueryResponse,
+)
 from app.services.document_service import DocumentService
 
 
@@ -45,6 +51,17 @@ def upload_document(
 @app.get("/documents", response_model=list[DocumentSummary])
 def list_documents(service: DocumentService = Depends(get_document_service)) -> list[DocumentSummary]:
     return service.list_documents()
+
+
+@app.get("/documents/{document_id}/insights", response_model=DocumentInsight)
+def get_document_insight(
+    document_id: str,
+    service: DocumentService = Depends(get_document_service),
+) -> DocumentInsight:
+    insight = service.get_document_insight(document_id)
+    if not insight:
+        raise HTTPException(status_code=404, detail="Document not found")
+    return insight
 
 
 @app.get("/history", response_model=list[QueryHistoryItem])
