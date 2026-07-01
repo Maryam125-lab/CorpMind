@@ -12,9 +12,11 @@ import {
   FileSearch,
   FileText,
   Filter,
+  FolderOpen,
   GitBranch,
   History,
   Layers3,
+  LayoutDashboard,
   Loader2,
   MessageSquareText,
   Network,
@@ -72,6 +74,37 @@ const analysisModes = [
     icon: GitBranch,
     prefix:
       "Compare the selected sources and identify agreements, conflicts, and unique facts. Question: "
+  }
+];
+
+const appViews = [
+  {
+    id: "overview",
+    label: "Overview",
+    icon: LayoutDashboard,
+    title: "Command Overview",
+    description: "Corpus health, active scope, intelligence, and recent analysis in one place."
+  },
+  {
+    id: "documents",
+    label: "Documents",
+    icon: FolderOpen,
+    title: "Document Center",
+    description: "Upload, inspect, filter, select, and manage the knowledge sources."
+  },
+  {
+    id: "ask",
+    label: "Ask",
+    icon: MessageSquareText,
+    title: "RAG Q&A",
+    description: "Ask grounded questions, switch analysis modes, and review cited answers."
+  },
+  {
+    id: "activity",
+    label: "Activity",
+    icon: History,
+    title: "Evidence & History",
+    description: "Review citations, query history, and reusable analysis sessions."
   }
 ];
 
@@ -164,6 +197,7 @@ function App() {
   const [question, setQuestion] = useState("");
   const [topK, setTopK] = useState(5);
   const [analysisMode, setAnalysisMode] = useState("answer");
+  const [activeView, setActiveView] = useState("overview");
   const [answer, setAnswer] = useState(null);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -227,6 +261,7 @@ function App() {
   const selectedLabel = selectedCount ? `${selectedCount} selected` : "All sources";
   const vectorStore = demoMode ? "demo-vector" : answer?.metadata?.vector_store || "ready";
   const currentMode = analysisModes.find((mode) => mode.id === analysisMode) || analysisModes[0];
+  const currentView = appViews.find((view) => view.id === activeView) || appViews[0];
   const activeSession = sessions.find((session) => session.id === activeSessionId) || sessions[0];
   const confidenceScore = answer?.confidence === "high" ? 94 : answer?.confidence === "medium" ? 72 : answer ? 48 : 0;
 
@@ -317,11 +352,13 @@ function App() {
         }));
         setSelectedIds((current) => [...new Set([documentId, ...current])]);
         setActiveDocumentId(documentId);
+        setActiveView("documents");
       } else {
         const uploaded = await uploadDocument(file);
         await refreshDocuments();
         setSelectedIds((current) => [...new Set([...current, uploaded.document_id])]);
         setActiveDocumentId(uploaded.document_id);
+        setActiveView("documents");
       }
     } catch (err) {
       setError(err.message);
@@ -349,6 +386,7 @@ function App() {
           });
       setAnswer(data);
       setActiveCitation(data.citations[0] || null);
+      setActiveView("ask");
       appendSessionMessage(question.trim(), data);
       if (demoMode) {
         setHistory((current) => [
@@ -391,6 +429,7 @@ function App() {
           });
       setAnswer(data);
       setActiveCitation(data.citations[0] || null);
+      setActiveView("ask");
       appendSessionMessage(prompt, data);
       if (!demoMode) await refreshHistory();
     } catch (err) {
@@ -491,6 +530,7 @@ function App() {
     setActiveSessionId(id);
     setAnswer(null);
     setQuestion("");
+    setActiveView("activity");
   }
 
   function toggleDocument(documentId) {
@@ -535,6 +575,29 @@ function App() {
         </div>
       </section>
 
+      <section className="app-navigation" aria-label="Primary navigation">
+        <div>
+          <h2>{currentView.title}</h2>
+          <p>{currentView.description}</p>
+        </div>
+        <div className="nav-tabs">
+          {appViews.map((view) => {
+            const Icon = view.icon;
+            return (
+              <button
+                className={activeView === view.id ? "active" : ""}
+                key={view.id}
+                type="button"
+                onClick={() => setActiveView(view.id)}
+              >
+                <Icon size={16} />
+                <span>{view.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
       <section className="insight-strip" aria-label="Corpus summary">
         <Metric icon={FileText} label="Documents" value={documents.length} />
         <Metric icon={Layers3} label="Chunks indexed" value={totalChunks} />
@@ -544,7 +607,7 @@ function App() {
 
       {error ? <div className="error-banner">{error}</div> : null}
 
-      <section className="workspace">
+      <section className={`workspace view-${activeView}`}>
         <aside className="sidebar" aria-label="Document library">
           <label className="upload-zone">
             <input type="file" accept=".pdf,.txt,.md" onChange={handleUpload} />
@@ -614,7 +677,10 @@ function App() {
                       type="button"
                       aria-label={`Inspect ${document.filename}`}
                       title="Inspect"
-                      onClick={() => setActiveDocumentId(document.document_id)}
+                      onClick={() => {
+                        setActiveDocumentId(document.document_id);
+                        setActiveView("documents");
+                      }}
                     >
                       <Eye size={16} />
                     </button>
@@ -728,13 +794,13 @@ function App() {
 
               <button className="primary-button" type="submit" disabled={busy === "ask"}>
                 {busy === "ask" ? <Loader2 className="spin" size={18} /> : <Search size={18} />}
-                <span>{busy === "ask" ? "Searching" : "Ask"}</span>
+                <span>{busy === "ask" ? "Searching" : "Run query"}</span>
               </button>
             </div>
           </form>
 
           <section className="intelligence-grid" aria-label="Advanced analysis">
-            <DocumentIntel insight={activeInsight} />
+            <DocumentIntel insight={activeInsight} onOpenAsk={() => setActiveView("ask")} />
             <SessionPanel
               activeSession={activeSession}
               sessions={sessions}
@@ -879,7 +945,7 @@ function Metric({ icon: Icon, label, value }) {
   );
 }
 
-function DocumentIntel({ insight }) {
+function DocumentIntel({ insight, onOpenAsk }) {
   if (!insight) {
     return (
       <section className="intel-card">
@@ -907,6 +973,10 @@ function DocumentIntel({ insight }) {
       <p className="preview-copy">{insight.preview}</p>
       <TagList label="Key terms" values={insight.key_terms} />
       <TagList label="Risk terms" values={insight.risk_terms} tone="risk" />
+      <button className="secondary-button intel-action" type="button" onClick={onOpenAsk}>
+        <MessageSquareText size={16} />
+        Ask this source
+      </button>
     </section>
   );
 }

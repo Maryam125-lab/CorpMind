@@ -33,6 +33,7 @@ button {
 }
 
 .topbar,
+.app-navigation,
 .insight-strip,
 .workspace,
 .error-banner {
@@ -47,6 +48,66 @@ button {
   gap: 18px;
   justify-content: space-between;
   margin-bottom: 16px;
+}
+
+.app-navigation {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #dbe4df;
+  border-radius: 8px;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding: 12px;
+}
+
+.app-navigation h2,
+.app-navigation p {
+  margin: 0;
+}
+
+.app-navigation h2 {
+  font-size: 18px;
+}
+
+.app-navigation p {
+  color: #64716e;
+  font-size: 13px;
+  margin-top: 3px;
+}
+
+.nav-tabs {
+  background: #f2f6f4;
+  border: 1px solid #dbe4df;
+  border-radius: 8px;
+  display: grid;
+  flex: 0 0 auto;
+  gap: 6px;
+  grid-template-columns: repeat(4, minmax(110px, 1fr));
+  padding: 6px;
+}
+
+.nav-tabs button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  color: #40504c;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 850;
+  gap: 7px;
+  justify-content: center;
+  min-height: 38px;
+  padding: 0 11px;
+  white-space: nowrap;
+}
+
+.nav-tabs button.active {
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(28, 40, 38, 0.08);
+  color: #0d5b55;
 }
 
 .brand {
@@ -185,6 +246,39 @@ button {
   display: grid;
   gap: 16px;
   grid-template-columns: minmax(280px, 340px) minmax(430px, 1fr) minmax(300px, 410px);
+}
+
+.workspace.view-documents {
+  grid-template-columns: minmax(320px, 430px) minmax(0, 1fr);
+}
+
+.workspace.view-documents .citations-pane,
+.workspace.view-documents .ask-form,
+.workspace.view-documents .answer-panel {
+  display: none;
+}
+
+.workspace.view-documents .intelligence-grid {
+  grid-template-columns: minmax(0, 1.1fr) minmax(260px, 0.9fr);
+}
+
+.workspace.view-ask .intelligence-grid {
+  display: none;
+}
+
+.workspace.view-activity {
+  grid-template-columns: minmax(430px, 1fr) minmax(300px, 430px);
+}
+
+.workspace.view-activity .sidebar,
+.workspace.view-activity .ask-form,
+.workspace.view-activity .answer-panel,
+.workspace.view-activity .intelligence-grid .intel-card:first-child {
+  display: none;
+}
+
+.workspace.view-activity .intelligence-grid {
+  grid-template-columns: 1fr;
 }
 
 .sidebar,
@@ -714,6 +808,10 @@ button {
   font-size: 12px;
 }
 
+.intel-action {
+  justify-self: start;
+}
+
 .session-card {
   align-content: start;
 }
@@ -924,10 +1022,27 @@ button {
     grid-column: 1 / -1;
     min-height: 320px;
   }
+
+  .workspace.view-activity {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 980px) {
+  .app-navigation {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .nav-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .intelligence-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace.view-documents {
     grid-template-columns: 1fr;
   }
 }
@@ -965,5 +1080,9 @@ button {
 
   .mode-tabs {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .nav-tabs {
+    grid-template-columns: 1fr;
   }
 }
