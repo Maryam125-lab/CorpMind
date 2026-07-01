@@ -17,5 +17,10 @@ docs/demo-video/scene*.wav
 docs/demo-video/segment*.mp4
 docs/demo-video/segments.txt
 !docs/demo-video/corpmind-portfolio-demo.mp4
+docs/demo-video-english/scene*.png
+docs/demo-video-english/scene*.wav
+docs/demo-video-english/segment*.mp4
+docs/demo-video-english/segments.txt
+!docs/demo-video-english/corpmind-english-portfolio-demo.mp4
 !backend/data/uploads/.gitkeep
 !backend/data/chroma/.gitkeep
