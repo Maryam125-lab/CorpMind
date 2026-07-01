@@ -12,5 +12,10 @@ backend/data/uploads/*
 backend/data/chroma/*
 backend/data/documents.json
 backend/data/history.json
+docs/demo-video/scene*.png
+docs/demo-video/scene*.wav
+docs/demo-video/segment*.mp4
+docs/demo-video/segments.txt
+!docs/demo-video/corpmind-portfolio-demo.mp4
 !backend/data/uploads/.gitkeep
 !backend/data/chroma/.gitkeep
